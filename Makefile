@@ -21,6 +21,8 @@ build:; forge build
 
 test :; forge test 
 
+test-one :; forge test --match-test $(NAME) -vvv
+
 snapshot :; forge snapshot
 
 format :; forge fmt

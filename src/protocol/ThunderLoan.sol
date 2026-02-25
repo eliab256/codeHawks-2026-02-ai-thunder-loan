@@ -1,67 +1,6 @@
-//      .edee...      .....       .eeec.   ..eee..
-//    .d*"  """"*e..d*"""""**e..e*""  "*c.d""  ""*e.
-//   z"           "$          $""       *F         **e.
-//  z"             "c        d"          *.           "$.
-// .F                        "            "            'F
-// d                                                   J%
-// 3         .                                        e"
-// 4r       e"              .                        d"
-//  $     .d"     .        .F             z ..zeeeeed"
-//  "*beeeP"      P        d      e.      $**""    "
-//      "*b.     Jbc.     z*%e.. .$**eeeeP"
-//         "*beee* "$$eeed"  ^$$$""    "
-//                  '$$.     .$$$c
-//                   "$$.   e$$*$$c
-//                    "$$..$$P" '$$r
-//                     "$$$$"    "$$.           .d
-//         z.          .$$$"      "$$.        .dP"
-//         ^*e        e$$"         "$$.     .e$"
-//           *b.    .$$P"           "$$.   z$"
-//            "$c  e$$"              "$$.z$*"
-//             ^*e$$P"                "$$$"
-//               *$$                   "$$r
-//               '$$F                 .$$P
-//                $$$                z$$"
-//                4$$               d$$b.
-//                .$$%            .$$*"*$$e.
-//             e$$$*"            z$$"    "*$$e.
-//            4$$"              d$P"        "*$$e.
-//            $P              .d$$$c           "*$$e..
-//           d$"             z$$" *$b.            "*$L
-//          4$"             e$P"   "*$c            ^$$
-//          $"            .d$"       "$$.           ^$r
-//         dP            z$$"         ^*$e.          "b
-//        4$            e$P             "$$           "
-//                     J$F               $$
-//                     $$               .$F
-//                    4$"               $P"
-//                    $"               dP    Gilo94'
-// https://www.asciiart.eu/nature/lightning
-//  ▄▄▄▄▄▄▄▄▄▄▄  ▄         ▄  ▄         ▄  ▄▄        ▄  ▄▄▄▄▄▄▄▄▄▄   ▄▄▄▄▄▄▄▄▄▄▄  ▄▄▄▄▄▄▄▄▄▄▄
-// ▐░░░░░░░░░░░▌▐░▌       ▐░▌▐░▌       ▐░▌▐░░▌      ▐░▌▐░░░░░░░░░░▌ ▐░░░░░░░░░░░▌▐░░░░░░░░░░░▌
-//  ▀▀▀▀█░█▀▀▀▀ ▐░▌       ▐░▌▐░▌       ▐░▌▐░▌░▌     ▐░▌▐░█▀▀▀▀▀▀▀█░▌▐░█▀▀▀▀▀▀▀▀▀ ▐░█▀▀▀▀▀▀▀█░▌
-//      ▐░▌     ▐░▌       ▐░▌▐░▌       ▐░▌▐░▌▐░▌    ▐░▌▐░▌       ▐░▌▐░▌          ▐░▌       ▐░▌
-//      ▐░▌     ▐░█▄▄▄▄▄▄▄█░▌▐░▌       ▐░▌▐░▌ ▐░▌   ▐░▌▐░▌       ▐░▌▐░█▄▄▄▄▄▄▄▄▄ ▐░█▄▄▄▄▄▄▄█░▌
-//      ▐░▌     ▐░░░░░░░░░░░▌▐░▌       ▐░▌▐░▌  ▐░▌  ▐░▌▐░▌       ▐░▌▐░░░░░░░░░░░▌▐░░░░░░░░░░░▌
-//      ▐░▌     ▐░█▀▀▀▀▀▀▀█░▌▐░▌       ▐░▌▐░▌   ▐░▌ ▐░▌▐░▌       ▐░▌▐░█▀▀▀▀▀▀▀▀▀ ▐░█▀▀▀▀█░█▀▀
-//      ▐░▌     ▐░▌       ▐░▌▐░▌       ▐░▌▐░▌    ▐░▌▐░▌▐░▌       ▐░▌▐░▌          ▐░▌     ▐░▌
-//      ▐░▌     ▐░▌       ▐░▌▐░█▄▄▄▄▄▄▄█░▌▐░▌     ▐░▐░▌▐░█▄▄▄▄▄▄▄█░▌▐░█▄▄▄▄▄▄▄▄▄ ▐░▌      ▐░▌
-//      ▐░▌     ▐░▌       ▐░▌▐░░░░░░░░░░░▌▐░▌      ▐░░▌▐░░░░░░░░░░▌ ▐░░░░░░░░░░░▌▐░▌       ▐░▌
-//       ▀       ▀         ▀  ▀▀▀▀▀▀▀▀▀▀▀  ▀        ▀▀  ▀▀▀▀▀▀▀▀▀▀   ▀▀▀▀▀▀▀▀▀▀▀  ▀         ▀
-//
-//  ▄            ▄▄▄▄▄▄▄▄▄▄▄  ▄▄▄▄▄▄▄▄▄▄▄  ▄▄        ▄
-// ▐░▌          ▐░░░░░░░░░░░▌▐░░░░░░░░░░░▌▐░░▌      ▐░▌
-// ▐░▌          ▐░█▀▀▀▀▀▀▀█░▌▐░█▀▀▀▀▀▀▀█░▌▐░▌░▌     ▐░▌
-// ▐░▌          ▐░▌       ▐░▌▐░▌       ▐░▌▐░▌▐░▌    ▐░▌
-// ▐░▌          ▐░▌       ▐░▌▐░█▄▄▄▄▄▄▄█░▌▐░▌ ▐░▌   ▐░▌
-// ▐░▌          ▐░▌       ▐░▌▐░░░░░░░░░░░▌▐░▌  ▐░▌  ▐░▌
-// ▐░▌          ▐░▌       ▐░▌▐░█▀▀▀▀▀▀▀█░▌▐░▌   ▐░▌ ▐░▌
-// ▐░▌          ▐░▌       ▐░▌▐░▌       ▐░▌▐░▌    ▐░▌▐░▌
-// ▐░█▄▄▄▄▄▄▄▄▄ ▐░█▄▄▄▄▄▄▄█░▌▐░▌       ▐░▌▐░▌     ▐░▐░▌
-// ▐░░░░░░░░░░░▌▐░░░░░░░░░░░▌▐░▌       ▐░▌▐░▌      ▐░░▌
-//  ▀▀▀▀▀▀▀▀▀▀▀  ▀▀▀▀▀▀▀▀▀▀▀  ▀         ▀  ▀        ▀▀
+
 // SPDX-License-Identifier: AGPL-3.0-only
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { AssetToken } from "./AssetToken.sol";
@@ -146,13 +85,25 @@ contract ThunderLoan is Initializable, OwnableUpgradeable, UUPSUpgradeable, Orac
 
     function deposit(IERC20 token, uint256 amount) external revertIfZero(amount) revertIfNotAllowedToken(token) {
         AssetToken assetToken = s_tokenToAssetToken[token];
+        
         uint256 exchangeRate = assetToken.getExchangeRate();
-        uint256 mintAmount = (amount * assetToken.EXCHANGE_RATE_PRECISION()) / exchangeRate;
+        uint256 amountNormalized = _normalizeDecimals(amount, IERC20Metadata(address(token)).decimals());
+        uint256 mintAmount = (amountNormalized * assetToken.EXCHANGE_RATE_PRECISION()) / exchangeRate;
         emit Deposit(msg.sender, token, amount);
         assetToken.mint(msg.sender, mintAmount);
-        uint256 calculatedFee = getCalculatedFee(token, amount);
+        uint256 calculatedFee = getCalculatedFee(token, amountNormalized);
         assetToken.updateExchangeRate(calculatedFee);
         token.safeTransferFrom(msg.sender, address(assetToken), amount);
+    }
+
+    function _normalizeDecimals(uint256 amount, uint8 tokenDecimals) internal pure returns (uint256) {
+        if (tokenDecimals < 18) {
+            return amount * (10 ** (18 - tokenDecimals));
+        } else if (tokenDecimals > 18) {
+            revert("Token decimals greater than 18 not supported");
+        } else {
+            return amount;
+        }
     }
 
     /// @notice Withdraws the underlying token from the asset token
@@ -169,6 +120,7 @@ contract ThunderLoan is Initializable, OwnableUpgradeable, UUPSUpgradeable, Orac
         AssetToken assetToken = s_tokenToAssetToken[token];
         uint256 exchangeRate = assetToken.getExchangeRate();
         if (amountOfAssetToken == type(uint256).max) {
+            // @audit-issue possible problem with balanceOf external call and reentrancy
             amountOfAssetToken = assetToken.balanceOf(msg.sender);
         }
         uint256 amountUnderlying = (amountOfAssetToken * exchangeRate) / assetToken.EXCHANGE_RATE_PRECISION();
@@ -277,5 +229,6 @@ contract ThunderLoan is Initializable, OwnableUpgradeable, UUPSUpgradeable, Orac
         return s_feePrecision;
     }
 
+    // @audit-info check this impleemntation upgrade function
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner { }
 }
