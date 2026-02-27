@@ -148,6 +148,7 @@ contract ThunderLoan is
     ) external revertIfZero(amountOfAssetToken) revertIfNotAllowedToken(token) {
         AssetToken assetToken = s_tokenToAssetToken[token];
         uint256 exchangeRate = assetToken.getExchangeRate();
+        // @audit-info questo type(uint256).max può essere pricoloso?
         if (amountOfAssetToken == type(uint256).max) {
             // @audit-issue possible problem with balanceOf external call and reentrancy
             amountOfAssetToken = assetToken.balanceOf(msg.sender);
@@ -181,7 +182,7 @@ contract ThunderLoan is
         // slither-disable-next-line reentrancy-vulnerabilities-2 reentrancy-vulnerabilities-3
         assetToken.updateExchangeRate(fee);
         emit FlashLoan(receiverAddress, token, amount, fee, params);
-        // @audit-info mi impedisce di fare repay ma non redeem
+        // @audit-ok mi impedisce di fare repay ma non redeem
 
         s_currentlyFlashLoaning[token] = true;
         assetToken.transferUnderlyingTo(receiverAddress, amount);
@@ -193,14 +194,14 @@ contract ThunderLoan is
                 amount,
                 fee,
                 msg.sender,
-                // @audit-info posso passare parametri e usare la executeOperation come callBack per fare operazioni
+                // @audit-ok posso passare parametri e usare la executeOperation come callBack per fare operazioni
                 // dopo aver ricevuto i fondi
                 params
             )
         );
 
         uint256 endingBalance = token.balanceOf(address(assetToken));
-        // @audit-issue here I can use deposit insted of repay and pass the check stealing tokens
+        // @audit-ok here I can use deposit insted of repay and pass the check stealing tokens
         if (endingBalance < startingBalance + fee) {
             revert ThunderLoan__NotPaidBack(
                 startingBalance + fee,

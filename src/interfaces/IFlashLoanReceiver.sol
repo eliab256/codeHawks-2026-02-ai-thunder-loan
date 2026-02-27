@@ -15,5 +15,5 @@ interface IFlashLoanReceiver {
         address initiator,
         bytes calldata params
     ) external returns (bool);
-    //@audit-issue why return bool?
+    //@audit-ok why return bool?
 }

@@ -12,6 +12,8 @@ import {
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AssetToken} from "../../src/protocol/AssetToken.sol";
 import {IFlashLoanReceiver} from "../../src/interfaces/IFlashLoanReceiver.sol";
+import {IThunderLoan} from "../../src/interfaces/IThunderLoan.sol";
+import {IThunderLoanFixed} from "../../src/interfaces/IThunderLoanFixed.sol";
 
 contract ERC20Mock6Decimals is ERC20Mock {
     uint8 private immutable i_decimals;
@@ -40,6 +42,7 @@ contract POCtest is Test {
     AssetToken assetTokenB;
 
     address depositer = makeAddr("depositer");
+    address flahLoanReceiver = makeAddr("flashLoanReceiver");
     address flashLoanAttacker = makeAddr("flashLoanAttacker");
 
     function setUp() public virtual {
@@ -236,6 +239,62 @@ contract POCtest is Test {
             1,
             "AssetToken should have 0 tokens after the attack"
         );
+    }
+
+    function testThunderLoanInterface() public {
+        // This test use Basetest.t.sol setup
+        tokenA.mint(depositer, 50000 * 10 ** tokenA.decimals()); //fund depositer with tokenA
+        assetTokenA = thunderLoan.setAllowedToken(
+            IERC20(address(tokenA)),
+            true
+        );
+
+        // AssetTokenA has 0 tokenA deposited, now depositer will deposit TokenA and allows flashLoan
+        vm.startPrank(depositer);
+        uint256 depositAmount = tokenA.balanceOf(depositer);
+        tokenA.approve(address(thunderLoan), depositAmount);
+        thunderLoan.deposit(tokenA, depositAmount);
+        vm.stopPrank();
+
+        vm.startPrank(flahLoanReceiver);
+        FlashLoanReceiver receiverContract = new FlashLoanReceiver(
+            address(thunderLoan)
+        );
+        tokenA.mint(address(receiverContract), 100 * 10 ** tokenA.decimals()); // fund receiverContract with tokenA to pay fee
+
+        receiverContract.requestFlashLoan(address(tokenA));
+    }
+}
+
+contract FlashLoanReceiver {
+    IThunderLoanFixed private immutable i_thunderLoan;
+
+    constructor(address thunderLoan) {
+        i_thunderLoan = IThunderLoanFixed(thunderLoan);
+    }
+
+    //amount 1
+    function requestFlashLoan(address _underlyingToken) external {
+        uint256 flashLoanAmount = 1 *
+            10 ** ERC20Mock(_underlyingToken).decimals();
+
+        i_thunderLoan.flashloan(
+            address(this),
+            _underlyingToken,
+            flashLoanAmount,
+            ""
+        );
+    }
+
+    function executeOperation(
+        address token,
+        uint256 amount,
+        uint256 fee,
+        address initiator,
+        bytes calldata params
+    ) external {
+        IERC20(token).approve(address(i_thunderLoan), amount + fee);
+        i_thunderLoan.repay(IERC20(token), amount + fee);
     }
 }
 
