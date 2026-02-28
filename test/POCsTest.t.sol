@@ -16,6 +16,12 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AssetToken} from "../src/protocol/AssetToken.sol";
 import {IFlashLoanReceiver} from "../src/interfaces/IFlashLoanReceiver.sol";
 import {IThunderLoanFixed} from "../src/interfaces/IThunderLoanFixed.sol";
+import {
+    UUPSUpgradeable
+} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {
+    Initializable
+} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 contract ERC20Mock6Decimals is ERC20Mock {
     uint8 private immutable i_decimals;
@@ -355,7 +361,150 @@ contract POCtest is Test {
         // Fee is now 100% of borrowed amount, not 0.3%
         assertNotEq(feeAfter, feeBefore);
         assertEq(feeAfter, borrowAmount);
+    }
 
+    function testAutorizeUpgradeDoesntCheckCompatibilityWithInterface() public {
+        // SETUP: allow tokenA and fund the depositer
+        assetTokenA = thunderLoan.setAllowedToken(
+            IERC20(address(tokenA)),
+            true
+        );
+
+        vm.startPrank(depositer);
+        tokenA.approve(address(thunderLoan), 50000e18);
+        thunderLoan.deposit(IERC20(address(tokenA)), 50000e18);
+        vm.stopPrank();
+
+        // STEP 1: verify deposit works correctly BEFORE upgrade
+        uint256 depositerBalanceBefore = assetTokenA.balanceOf(depositer);
+        assertGt(
+            depositerBalanceBefore,
+            0,
+            "Depositer should have assetTokens before upgrade"
+        );
+        console.log("=== BEFORE UPGRADE ===");
+        console.log("Depositer assetToken balance: ", depositerBalanceBefore);
+        console.log("deposit() works correctly    : true");
+
+        // STEP 2: owner upgrades to incompatible implementation
+        // _authorizeUpgrade() only checks onlyOwner — never verifies interface compatibility
+        IncompatibleImplementation incompatibleImpl = new IncompatibleImplementation();
+
+        vm.prank(thunderLoan.owner());
+        // This succeeds — _authorizeUpgrade() does NOT verify IThunderLoan compatibility
+        thunderLoan.upgradeTo(address(incompatibleImpl));
+
+        console.log("=== AFTER UPGRADE ===");
+        console.log("Upgraded to IncompatibleImplementation: true");
+
+        // STEP 3: cast proxy to IThunderLoanFixed and try to call deposit()
+        // The proxy now points to an implementation that does NOT have deposit()
+        IThunderLoanFixed thunderLoanFixed = IThunderLoanFixed(address(proxy));
+
+        uint256 newDepositAmount = 1000e18;
+        tokenA.mint(depositer, newDepositAmount);
+
+        vm.startPrank(depositer);
+        tokenA.approve(address(proxy), newDepositAmount);
+
+        // deposit() no longer exists in the new implementation
+        // the call will hit the fallback or revert with no function selector match
+        vm.expectRevert();
+        thunderLoanFixed.deposit(address(tokenA), newDepositAmount);
+        vm.stopPrank();
+
+        console.log("deposit() after upgrade      : REVERTED");
+        console.log("Protocol is bricked          : true");
+
+        // STEP 4: confirm also that existing depositer can't redeem their funds
+        vm.startPrank(depositer);
+        vm.expectRevert();
+        thunderLoanFixed.redeem(address(tokenA), depositerBalanceBefore);
+        vm.stopPrank();
+
+        console.log("redeem() after upgrade       : REVERTED");
+        console.log("Depositer funds are locked   : true");
+    }
+
+    function testInvalidTswapAddressBreaksProtocolPermanently() public {
+        // ================================================================
+        // SETUP: deploy a fresh proxy initialized with address(0) as tswapAddress
+        // This simulates a misconfigured deploy script
+        // NOTE: uses a separate proxy from setUp() to isolate the test
+        // ================================================================
+        ThunderLoan freshImplementation = new ThunderLoan();
+        ERC1967Proxy freshProxy = new ERC1967Proxy(
+            address(freshImplementation),
+            ""
+        );
+        ThunderLoan freshThunderLoan = ThunderLoan(address(freshProxy));
+
+        // Initialize with address(0) — no validation prevents this
+        freshThunderLoan.initialize(address(0));
+
+        // Allow tokenA so we can attempt deposits
+        vm.prank(freshThunderLoan.owner());
+        freshThunderLoan.setAllowedToken(IERC20(address(tokenA)), true);
+
+        // STEP 1: prove deposit() is permanently broken
+        // deposit() → getCalculatedFee() → getPriceInWeth() →
+        // IPoolFactory(address(0)).getPool() → call to address(0) → revert
+        uint256 depositAmount = 1000e18;
+        tokenA.mint(depositer, depositAmount);
+
+        vm.startPrank(depositer);
+        tokenA.approve(address(freshProxy), depositAmount);
+        vm.expectRevert();
+        freshThunderLoan.deposit(IERC20(address(tokenA)), depositAmount);
+        vm.stopPrank();
+
+        // STEP 2: prove flashloan() is permanently broken
+        // same call chain as deposit() → revert on getPriceInWeth()
+        FlashLoanReceiver receiver = new FlashLoanReceiver(address(freshProxy));
+        tokenA.mint(address(receiver), 100e18);
+
+        vm.expectRevert();
+        receiver.requestFlashLoan(address(tokenA), 1e18);
+
+        // STEP 3: prove re-initialization is impossible
+        // initializer modifier prevents initialize() from being called again
+        // the misconfiguration is permanently written to storage
+        vm.expectRevert();
+        freshThunderLoan.initialize(address(mockPoolFactory)); // ← try to fix with valid address
+
+        // STEP 4: prove the only recovery path is an upgradebut this requires the owner to be aware of the issue and act
+        ThunderLoanUpgraded fixedImplementation = new ThunderLoanUpgraded();
+
+        vm.prank(freshThunderLoan.owner());
+        freshThunderLoan.upgradeTo(address(fixedImplementation));
+
+        ThunderLoanUpgraded fixedThunderLoan = ThunderLoanUpgraded(
+            address(freshProxy)
+        );
+
+        // Even after upgrade, initialize() of the new implementation
+        // cannot be called because _initialized flag is already set
+        vm.expectRevert();
+        fixedThunderLoan.initialize(address(mockPoolFactory));
+
+        // FINAL ASSERTS
+        // deposit() works in ThunderLoanUpgraded because it no longer calls getCalculatedFee()
+        // but flashloan() still calls getPriceInWeth() → s_poolFactory = address(0) → revert
+        tokenA.mint(depositer, depositAmount);
+        vm.startPrank(depositer);
+        tokenA.approve(address(freshProxy), depositAmount);
+        fixedThunderLoan.deposit(IERC20(address(tokenA)), depositAmount); // ← succeeds
+        vm.stopPrank();
+
+        // flashloan still reverts after upgrade — s_poolFactory is still address(0)
+        FlashLoanReceiver receiverAfterUpgrade = new FlashLoanReceiver(
+            address(freshProxy)
+        );
+        tokenA.mint(address(receiverAfterUpgrade), 100e18);
+        vm.expectRevert();
+        receiverAfterUpgrade.requestFlashLoan(address(tokenA), 1e18); // ← still broken
+
+        assertEq(fixedThunderLoan.getPoolFactoryAddress(), address(0));
     }
 }
 
@@ -492,5 +641,17 @@ contract FlashLoanAttacker {
         IERC20(token).approve(address(i_thunderLoan), amount + fee);
         i_thunderLoan.deposit(IERC20(token), amount + fee);
         //Now Atacker has asset tokens ready to be redeemed after flashLoan execution
+    }
+}
+
+contract IncompatibleImplementation is Initializable, UUPSUpgradeable {
+    function initialize() external initializer {
+        __UUPSUpgradeable_init();
+    }
+
+    function _authorizeUpgrade(address newImplementation) internal override {}
+
+    function someUnrelatedFunction() external pure returns (string memory) {
+        return "I am incompatible";
     }
 }

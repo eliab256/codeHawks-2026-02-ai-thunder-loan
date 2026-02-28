@@ -149,7 +149,6 @@ contract ThunderLoan is
     ) external revertIfZero(amountOfAssetToken) revertIfNotAllowedToken(token) {
         AssetToken assetToken = s_tokenToAssetToken[token];
         uint256 exchangeRate = assetToken.getExchangeRate();
-        // @audit-info questo type(uint256).max può essere pricoloso?
         if (amountOfAssetToken == type(uint256).max) {
             amountOfAssetToken = assetToken.balanceOf(msg.sender);
         }
