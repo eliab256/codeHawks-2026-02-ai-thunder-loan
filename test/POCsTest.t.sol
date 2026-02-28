@@ -506,6 +506,78 @@ contract POCtest is Test {
 
         assertEq(fixedThunderLoan.getPoolFactoryAddress(), address(0));
     }
+
+    function testGetFeePrecisionRevertsAfterUpgrade() public {
+        // SETUP: allow tokenA and fund the depositer
+        assetTokenA = thunderLoan.setAllowedToken(
+            IERC20(address(tokenA)),
+            true
+        );
+
+        // STEP 1: verify getFeePrecision() works correctly BEFORE upgrade
+        // IThunderLoanFixed exposes getFeePrecision() and ThunderLoan implements it
+        IThunderLoanFixed thunderLoanFixed = IThunderLoanFixed(address(proxy));
+
+        uint256 feePrecisionBefore = thunderLoanFixed.getFeePrecision();
+        assertEq(
+            feePrecisionBefore,
+            1e18,
+            "Fee precision should be 1e18 before upgrade"
+        );
+
+        console.log("=== BEFORE UPGRADE ===");
+        console.log("getFeePrecision() returned: ", feePrecisionBefore); // 1e18 ✅
+
+        // STEP 2: upgrade to ThunderLoanUpgraded
+        // ThunderLoanUpgraded removes getFeePrecision() and replaces s_feePrecision
+        // with a constant FEE_PRECISION — the function is never reimplemented
+        ThunderLoanUpgraded thunderLoanUpgradedImplementation = new ThunderLoanUpgraded();
+
+        vm.prank(thunderLoan.owner());
+        thunderLoan.upgradeTo(address(thunderLoanUpgradedImplementation));
+
+        console.log("=== AFTER UPGRADE ===");
+
+        // STEP 3: prove getFeePrecision() is no longer available
+        // IThunderLoanFixed still declares it, but ThunderLoanUpgraded has no matching selector
+        // the call will revert because no function matches the selector in the new implementation
+        vm.expectRevert();
+        uint256 feePrecisionAfter = thunderLoanFixed.getFeePrecision();
+
+        // STEP 4: prove the impact — a FlashLoanAttacker that relies on getFeePrecision()
+        // to compute the max borrowable amount will revert entirely, breaking its logic
+        tokenA.mint(depositer, 50000e18);
+        vm.startPrank(depositer);
+        tokenA.approve(address(proxy), 50000e18);
+        ThunderLoanUpgraded(address(proxy)).deposit(
+            IERC20(address(tokenA)),
+            50000e18
+        );
+        vm.stopPrank();
+
+        uint256 initialAttackerBalance = 10e18;
+        tokenA.mint(flashLoanAttacker, initialAttackerBalance);
+
+        vm.startPrank(flashLoanAttacker);
+        FlashLoanAttacker attackerContract = new FlashLoanAttacker(
+            address(proxy)
+        );
+        tokenA.transfer(address(attackerContract), initialAttackerBalance);
+
+        // FlashLoanAttacker calls getFeePrecision() internally to compute maxAmount
+        // after upgrade this reverts — any integrator relying on getFeePrecision() is broken
+        vm.expectRevert();
+        attackerContract.attack(address(tokenA));
+        vm.stopPrank();
+
+        // FINAL ASSERT: confirm ThunderLoanUpgraded has no getFeePrecision()
+        // by verifying FEE_PRECISION constant exists but the function does not
+        assertEq(
+            ThunderLoanUpgraded(address(proxy)).FEE_PRECISION(),
+            1e18,
+            "FEE_PRECISION constant exists but getFeePrecision() function does not"
+        );
+    }
 }
 
 contract ExchangeRateManipulator {
