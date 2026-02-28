@@ -78,8 +78,8 @@ contract AssetToken is ERC20 {
     }
 
     function updateExchangeRate(uint256 fee) external onlyThunderLoan {
-        // @audit-info deve fare il calcolo sulla supply prima del deposito o dopo?
-        // @audit-issue check della totalSupply durante il flashloan, può creare problemi?
+        // @audit-ok deve fare il calcolo sulla supply prima del deposito o dopo?
+        // @audit-ok check della totalSupply durante il flashloan, può creare problemi?
         // 1. Get the current exchange rate
         // 2. How big the fee is should be divided by the total supply
         // 3. So if the fee is 1e18, and the total supply is 2e18, the exchange rate be multiplied by 1.5

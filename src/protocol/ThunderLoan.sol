@@ -134,6 +134,7 @@ contract ThunderLoan is
             exchangeRate;
         emit Deposit(msg.sender, token, amount);
         assetToken.mint(msg.sender, mintAmount);
+        //@audit-info why calculate fee on deposit?
         uint256 calculatedFee = getCalculatedFee(token, amount);
         assetToken.updateExchangeRate(calculatedFee);
         token.safeTransferFrom(msg.sender, address(assetToken), amount);
@@ -150,7 +151,6 @@ contract ThunderLoan is
         uint256 exchangeRate = assetToken.getExchangeRate();
         // @audit-info questo type(uint256).max può essere pricoloso?
         if (amountOfAssetToken == type(uint256).max) {
-            // @audit-issue possible problem with balanceOf external call and reentrancy
             amountOfAssetToken = assetToken.balanceOf(msg.sender);
         }
         uint256 amountUnderlying = (amountOfAssetToken * exchangeRate) /
@@ -166,7 +166,6 @@ contract ThunderLoan is
         uint256 amount,
         bytes calldata params
     ) external {
-
         AssetToken assetToken = s_tokenToAssetToken[token];
         uint256 startingBalance = IERC20(token).balanceOf(address(assetToken));
 
